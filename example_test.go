@@ -11,7 +11,9 @@ func ExampleClient_GetUPSList() {
 	client, connectErr := nut.Connect("127.0.0.1")
 	if connectErr != nil {
 		fmt.Print(connectErr)
+		return
 	}
+	defer client.Close()
 	_, authenticationError := client.Authenticate("username", "password")
 	if authenticationError != nil {
 		fmt.Print(authenticationError)
