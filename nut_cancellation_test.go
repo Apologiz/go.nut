@@ -174,7 +174,7 @@ func TestCancellationClosesActiveIO(t *testing.T) {
 					t.Fatalf("peer did not drain to EOF: %v", err)
 				}
 			case <-time.After(time.Second):
-				t.Fatal("socket remained open")
+				t.Fatalf("peer did not reach EOF; local socket deadline check: %v", client.conn.SetDeadline(time.Now()))
 			}
 			if err := client.Close(); err != nil {
 				t.Fatal(err)
