@@ -64,6 +64,7 @@ func TestConnectContextAlreadyCancelled(t *testing.T) {
 
 func TestCancellationClosesActiveIO(t *testing.T) {
 	for _, operation := range []string{"read", "write", "logout", "slow"} {
+		operation := operation
 		t.Run(operation, func(t *testing.T) {
 			listener, err := net.Listen("tcp", "127.0.0.1:0")
 			if err != nil {
@@ -72,7 +73,13 @@ func TestCancellationClosesActiveIO(t *testing.T) {
 			defer listener.Close()
 			ready := make(chan struct{})
 			closed := make(chan error, 1)
-			ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+			var ctx context.Context
+			var cancel context.CancelFunc
+			if operation == "slow" {
+				ctx, cancel = context.WithTimeout(context.Background(), 250*time.Millisecond)
+			} else {
+				ctx, cancel = context.WithCancel(context.Background())
+			}
 			defer cancel()
 			go func() {
 				peer, err := listener.Accept()
@@ -81,6 +88,12 @@ func TestCancellationClosesActiveIO(t *testing.T) {
 					return
 				}
 				defer peer.Close()
+				if operation == "write" {
+					if err := peer.(*net.TCPConn).SetReadBuffer(1024); err != nil {
+						closed <- err
+						return
+					}
+				}
 				_ = peer.SetDeadline(time.Now().Add(3 * time.Second))
 				reader := bufio.NewReader(peer)
 				for _, command := range []string{"VER\n", "NETVER\n"} {
@@ -119,12 +132,17 @@ func TestCancellationClosesActiveIO(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer client.Close()
+			if operation == "write" {
+				if err := client.conn.(*net.TCPConn).SetWriteBuffer(1024); err != nil {
+					t.Fatal(err)
+				}
+			}
 			result := make(chan error, 1)
 			go func() {
 				var err error
 				switch operation {
 				case "write":
-					_, err = client.SendCommand(strings.Repeat("x", 16<<20))
+					_, err = client.SendCommand(strings.Repeat("x", 1<<20))
 				case "logout":
 					_, err = client.Disconnect()
 				case "slow":
