@@ -89,7 +89,7 @@ func TestCancellationClosesActiveIO(t *testing.T) {
 				}
 				defer peer.Close()
 				if operation == "write" {
-					if err := peer.(*net.TCPConn).SetReadBuffer(1024); err != nil {
+					if err := peer.(*net.TCPConn).SetReadBuffer(64 << 10); err != nil {
 						closed <- err
 						return
 					}
@@ -175,6 +175,9 @@ func TestCancellationClosesActiveIO(t *testing.T) {
 				}
 			case <-time.After(time.Second):
 				t.Fatalf("peer did not reach EOF; local socket deadline check: %v", client.conn.SetDeadline(time.Now()))
+			}
+			if err := client.conn.SetDeadline(time.Now()); !errors.Is(err, net.ErrClosed) {
+				t.Fatalf("context did not close the local socket: %v", err)
 			}
 			if err := client.Close(); err != nil {
 				t.Fatal(err)
