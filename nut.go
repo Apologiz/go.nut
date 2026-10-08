@@ -5,6 +5,7 @@ package nut
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -42,8 +43,21 @@ func Connect(hostname string, _port ...int) (Client, error) {
 	return client, nil
 }
 
-// Disconnect gracefully disconnects from NUT by sending the LOGOUT command.
+// Close releases the connection without sending LOGOUT. Repeated calls are safe.
+func (c *Client) Close() error {
+	if c.conn == nil {
+		return nil
+	}
+	err := c.conn.Close()
+	if errors.Is(err, net.ErrClosed) {
+		return nil
+	}
+	return err
+}
+
+// Disconnect sends LOGOUT and closes the connection, even if LOGOUT fails.
 func (c *Client) Disconnect() (bool, error) {
+	defer c.Close()
 	logoutResp, err := c.SendCommand("LOGOUT")
 	if err != nil {
 		return false, err
